@@ -1,3 +1,4 @@
+// our main linked-list implementation
 pub struct List<T> {
     head: Link<T>,
 }
@@ -39,6 +40,8 @@ impl<T> List<T> {
         })
     }
 
+    //// peek ////
+
     pub fn peek(&self) -> Option<&T> {
         self.head.as_ref().map(|node| &node.elem)
     }
@@ -46,6 +49,26 @@ impl<T> List<T> {
     pub fn peek_mut(&mut self) -> Option<&mut T> {
         // instead of reference with `as_ref`, return a mutable reference with `as_mut`
         self.head.as_mut().map(|node| &mut node.elem)
+    }
+
+    //// iterators ////
+
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
+
+    // the '_ here is to notify the reader that this
+    // is an "explicitly elided lifetime"
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter {
+            next: self.head.as_deref(),
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        IterMut {
+            next: self.head.as_deref_mut(),
+        }
     }
 }
 
@@ -61,13 +84,6 @@ impl<T> Drop for List<T> {
 // Into-Iterator implementations
 // will take own the values as it iterates
 pub struct IntoIter<T>(List<T>);
-
-impl<T> List<T> {
-    pub fn into_iter(self) -> IntoIter<T> {
-        IntoIter(self)
-    }
-}
-
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
@@ -81,17 +97,6 @@ impl<T> Iterator for IntoIter<T> {
 pub struct Iter<'a, T> {
     next: Option<&'a Node<T>>,
 }
-
-impl<T> List<T> {
-    // the '_ here is to notify the reader that this
-    // is an "explicitly elided lifetime"
-    pub fn iter(&self) -> Iter<'_, T> {
-        Iter {
-            next: self.head.as_deref(),
-        }
-    }
-}
-
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
@@ -108,19 +113,14 @@ impl<'a, T> Iterator for Iter<'a, T> {
 pub struct IterMut<'a, T> {
     next: Option<&'a mut Node<T>>,
 }
-
-impl<T> List<T> {
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        IterMut {
-            next: self.head.as_deref_mut(),
-        }
-    }
-}
-
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // Copy. So when we did self.next.map it was fine because the Option was just copied.
+        // Now we can't do that, because &mut isn't Copy (if you copied an &mut, you'd have
+        // two &mut's to the same location in memory, which is forbidden).
+        // Instead, we should properly take the Option to get it.
         self.next.take().map(|node| {
             self.next = node.next.as_deref_mut();
             &mut node.elem
