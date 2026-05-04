@@ -1,37 +1,67 @@
-// our main linked-list implementation
+/// ## [Second](https://rust-unofficial.github.io/too-many-lists/second.html)
+///
+/// A much better **stack** compared to the one in [`crate::first`].
+///
+/// Now uses Rust primitives like [`Option`] and [`Option::map`] instead of reinventing the wheel, and also supports peeking and iterating over the list.
 pub struct List<T> {
     head: Link<T>,
 }
 
-// we reinvented the "Option" wheel here, no ened to do that...
-// enum Link {
-//     Empty,
-//     More(Box<Node>),
-// }
-// so, just alias it as an Option
+/// We reinvented the "Option" wheel in the previous level (see below),
+/// no need to do that!
+///
+/// ```rs
+/// enum Link {
+///    Empty,
+///    More(Box<Node>),
+/// }
+/// ```
+///
+/// Here, `Empty` is just `None`, and `More(Box<Node>)` is just `Some(Box<Node>)`.
 type Link<T> = Option<Box<Node<T>>>;
 
+/// A typical linked list node:
+/// - it holds an element of type T
+/// - it holds a pointer to the next node in the list (or None if it's the end of the list)
 struct Node<T> {
     elem: T,
     next: Link<T>,
 }
 
 impl<T> List<T> {
+    /// We create the list with a `None` head, which signifies an empty list.
     pub fn new() -> Self {
         List { head: None }
     }
 
+    /// To add an element, we create a new node with the element and the current head as its next node,
+    /// and then we update the head to point to the new node.
+    ///
+    /// ```sh
+    /// # before
+    /// (top) node -> node -> None (bottom)
+    ///      (head)
+    ///
+    /// # after
+    /// (top) node* -> node -> node -> None (bottom)
+    ///      (head) (prev-head)
+    /// ```
     pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
             elem,
             // `mem::replace(&mut option, None)` is such an incredibly common
             // idiom that Option actually just went ahead and made it a method: take.
+            //
+            // this will move `self.head` out of `self` and send it to the `next` field of the new node, and replace `self.head` with `None`
             next: self.head.take(),
         });
 
+        // at this point head is `None`, so we can just put the new node in there
         self.head = Some(new_node);
     }
 
+    /// To pop an element, we take the head, and if it's not `None`,
+    /// we replace the head with the next node, and return the element of the old head.
     pub fn pop(&mut self) -> Option<T> {
         // `match option { None => None, Some(x) => Some(y) }` is such an incredibly common idiom that it was called map
         self.head.take().map(|node| {
@@ -117,8 +147,9 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Copy. So when we did self.next.map it was fine because the Option was just copied.
-        // Now we can't do that, because &mut isn't Copy (if you copied an &mut, you'd have
+        // `Copy`. when we did `self.next.map` it was fine because the `Option` was just copied.
+        //
+        // now we can't do that, because &mut isn't `Copy` (if you copied an &mut, you'd have
         // two &mut's to the same location in memory, which is forbidden).
         // Instead, we should properly take the Option to get it.
         self.next.take().map(|node| {
